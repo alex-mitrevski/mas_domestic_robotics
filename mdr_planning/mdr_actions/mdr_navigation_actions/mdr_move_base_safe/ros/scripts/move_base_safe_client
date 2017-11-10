@@ -1,0 +1,95 @@
+#!/usr/bin/env python
+import rospy
+import actionlib
+
+from mdr_move_base_safe.msg import MoveBaseSafeAction, MoveBaseSafeGoal
+import rosplan_dispatch_msgs.msg as plan_dispatch_msgs
+import rosplan_knowledge_msgs.srv as rosplan_srvs
+import diagnostic_msgs.msg as diag_msgs
+
+class MoveBaseSafeClient(object):
+    def __init__(self):
+        self.robot_name = None
+
+        self.action_name = rospy.get_param('~action_name', 'move_base_safe')
+        self.action_name = self.action_name.lower()
+
+        self.action_server_name = rospy.get_param('~server_name', 'move_base_safe_server')
+        self.action_timeout = rospy.get_param('~action_timeout', 15.)
+        rospy.Subscriber('action_dispatch_topic', plan_dispatch_msgs.ActionDispatch, self.call_action)
+
+        while not rospy.is_shutdown():
+            rospy.sleep(0.1)
+
+    def call_action(self, msg):
+        # we only react to calls to this action
+        if self.action_name != msg.name.lower():
+            return
+
+        client = actionlib.SimpleActionClient(self.action_server_name, MoveBaseSafeAction)
+        client.wait_for_server()
+        goal = self.get_action_message(msg)
+
+        # calling the actionlib server and waiting for the execution to end
+        rospy.loginfo('Sending action lib goal to move_base_safe_server, source : ' +
+                      goal.source_location + ' , destination : ' + goal.destination_location)
+        client.send_goal(goal)
+        client.wait_for_result(rospy.Duration.from_sec(int(self.action_timeout)))
+        result = client.get_result()
+        if result and result.success:
+            self.update_knowledge_base(goal.source_location, goal.destination_location)
+
+    def get_action_message(self, rosplan_action_msg):
+        '''Reads the action parameters and uses them to initialise an actionlib message.
+        '''
+        goal = MoveBaseSafeGoal()
+        goal.arm_safe_position = 'folded'
+        for param in rosplan_action_msg.parameters:
+            if param.key == 'from':
+                goal.source_location = param.value
+            elif param.key == 'to':
+                goal.destination_location = param.value
+            elif param.key == 'bot':
+                self.robot_name = param.value
+        return goal
+
+    def update_knowledge_base(self, source_location, destination_location):
+        # we add the fact that the robot is not at the source location to the knowledge base
+        request = rosplan_srvs.KnowledgeUpdateServiceRequest()
+        request.update_type = 0
+        request.knowledge.knowledge_type = 1
+        request.knowledge.attribute_name = 'robot_at'
+        request.knowledge.is_negative = True
+
+        arg_msg = diag_msgs.KeyValue()
+        arg_msg.key = 'bot'
+        arg_msg.value = self.robot_name
+        request.knowledge.values.append(arg_msg)
+
+        arg_msg = diag_msgs.KeyValue()
+        arg_msg.key = 'wp'
+        arg_msg.value = source_location
+        request.knowledge.values.append(arg_msg)
+
+        # we add the fact that the robot is at the destination location to the knowledge base
+        request = rosplan_srvs.KnowledgeUpdateServiceRequest()
+        request.update_type = 0
+        request.knowledge.knowledge_type = 1
+        request.knowledge.attribute_name = 'robot_at'
+
+        arg_msg = diag_msgs.KeyValue()
+        arg_msg.key = 'bot'
+        arg_msg.value = self.robot_name
+        request.knowledge.values.append(arg_msg)
+
+        arg_msg = diag_msgs.KeyValue()
+        arg_msg.key = 'wp'
+        arg_msg.value = destination_location
+        request.knowledge.values.append(arg_msg)
+
+if __name__ == '__main__':
+    rospy.init_node('move_base_safe_client')
+    try:
+        MoveBaseSafeClient()
+    except rospy.ROSInterruptException:
+        pass
