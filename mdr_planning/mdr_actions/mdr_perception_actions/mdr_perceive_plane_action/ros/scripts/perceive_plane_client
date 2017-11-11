@@ -1,0 +1,82 @@
+#!/usr/bin/env python
+import rospy
+import actionlib
+
+from mdr_perceive_plane_action.msg import PerceivePlaneAction, PerceivePlaneGoal
+import rosplan_dispatch_msgs.msg as plan_dispatch_msgs
+import rosplan_knowledge_msgs.srv as rosplan_srvs
+import diagnostic_msgs.msg as diag_msgs
+
+class PerceivePlaneClient(object):
+    def __init__(self):
+        self.robot_name = None
+
+        self.action_name = rospy.get_param('~action_name', 'perceive_plane')
+        self.action_name = self.action_name.lower()
+
+        self.action_server_name = rospy.get_param('~server_name', 'perceive_plane_server')
+        self.action_timeout = rospy.get_param('~action_timeout', 15.)
+        rospy.Subscriber('action_dispatch_topic', plan_dispatch_msgs.ActionDispatch, self.call_action)
+
+        while not rospy.is_shutdown():
+            rospy.sleep(0.1)
+
+    def call_action(self, msg):
+        # we only react to calls to this action
+        if self.action_name != msg.name.lower():
+            return
+
+        client = actionlib.SimpleActionClient(self.action_server_name, PerceivePlaneAction)
+        client.wait_for_server()
+        goal = self.get_action_message(msg)
+
+        # calling the actionlib server and waiting for the execution to end
+        rospy.loginfo('Sending action lib goal to' + self.action_server_name +
+                      ', plane_config: ' + goal.plane_config)
+        client.send_goal(goal)
+        client.wait_for_result(rospy.Duration.from_sec(int(self.action_timeout)))
+        result = client.get_result()
+        if result and result.success:
+            self.update_knowledge_base(goal.plane_config)
+
+    def get_action_message(self, rosplan_action_msg):
+        '''Reads the action parameters and uses them to initialise an actionlib message.
+        '''
+        goal = PerceivePlaneGoal()
+        for param in rosplan_action_msg.parameters:
+            if param.key == 'plane':
+                goal.plane_config = param.value
+            elif param.key == 'bot':
+                self.robot_name = param.value
+        return goal
+
+    def update_knowledge_base(self, plane):
+        # we add the fact that the plane is not unexplored anymore to the knowledge base
+        request = rosplan_srvs.KnowledgeUpdateServiceRequest()
+        request.update_type = 0
+        request.knowledge.knowledge_type = 1
+        request.knowledge.attribute_name = 'unexplored'
+        request.knowledge.is_negative = True
+
+        arg_msg = diag_msgs.KeyValue()
+        arg_msg.key = 'plane'
+        arg_msg.value = plane
+        request.knowledge.values.append(arg_msg)
+
+        # we add the fact that the plane is explored to the knowledge base
+        request = rosplan_srvs.KnowledgeUpdateServiceRequest()
+        request.update_type = 0
+        request.knowledge.knowledge_type = 1
+        request.knowledge.attribute_name = 'explored'
+
+        arg_msg = diag_msgs.KeyValue()
+        arg_msg.key = 'plane'
+        arg_msg.value = plane
+        request.knowledge.values.append(arg_msg)
+
+if __name__ == '__main__':
+    rospy.init_node('perceive_plane_client')
+    try:
+        PerceivePlaneClient()
+    except rospy.ROSInterruptException:
+        pass
