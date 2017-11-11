@@ -62,7 +62,7 @@
         )
     )
 
-    (:durative-action pick
+    (:durative-action pickup
         :parameters (?obj - object ?plane - plane ?bot - robot ?wp - waypoint)
         :duration ( = ?duration 10)
         :condition (and
