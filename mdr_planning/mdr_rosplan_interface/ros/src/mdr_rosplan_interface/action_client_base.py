@@ -13,10 +13,10 @@ class ActionClientBase(object):
 
         self.robot_name = None
 
-        self.action_name = rospy.get_param('~action_name', 'move_base_safe')
+        self.action_name = rospy.get_param('~action_name', '')
         self.action_name = self.action_name.lower()
 
-        self.action_server_name = rospy.get_param('~server_name', 'move_base_safe_server')
+        self.action_server_name = rospy.get_param('~server_name', '')
         self.action_timeout = rospy.get_param('~action_timeout', 15.)
 
         rospy.Subscriber('action_dispatch_topic',
