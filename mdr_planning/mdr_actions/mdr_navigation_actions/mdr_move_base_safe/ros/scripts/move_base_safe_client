@@ -2,21 +2,15 @@
 import rospy
 import actionlib
 
+from mdr_rosplan_interface.action_client_base import ActionClientBase
 from mdr_move_base_safe.msg import MoveBaseSafeAction, MoveBaseSafeGoal
 import rosplan_dispatch_msgs.msg as plan_dispatch_msgs
 import rosplan_knowledge_msgs.srv as rosplan_srvs
 import diagnostic_msgs.msg as diag_msgs
 
-class MoveBaseSafeClient(object):
+class MoveBaseSafeClient(ActionClientBase):
     def __init__(self):
-        self.robot_name = None
-
-        self.action_name = rospy.get_param('~action_name', 'move_base_safe')
-        self.action_name = self.action_name.lower()
-
-        self.action_server_name = rospy.get_param('~server_name', 'move_base_safe_server')
-        self.action_timeout = rospy.get_param('~action_timeout', 15.)
-        rospy.Subscriber('action_dispatch_topic', plan_dispatch_msgs.ActionDispatch, self.call_action)
+        super(MoveBaseSafeClient, self).__init__()
 
         while not rospy.is_shutdown():
             rospy.sleep(0.1)
@@ -25,6 +19,8 @@ class MoveBaseSafeClient(object):
         # we only react to calls to this action
         if self.action_name != msg.name.lower():
             return
+
+        self.action_id = msg.action_id
 
         client = actionlib.SimpleActionClient(self.action_server_name, MoveBaseSafeAction)
         client.wait_for_server()
@@ -36,8 +32,12 @@ class MoveBaseSafeClient(object):
         client.send_goal(goal)
         client.wait_for_result(rospy.Duration.from_sec(int(self.action_timeout)))
         result = client.get_result()
+
         if result and result.success:
             self.update_knowledge_base(goal.source_location, goal.destination_location)
+            self.send_action_feedback(True)
+        else:
+            self.send_action_feedback(False)
 
     def get_action_message(self, rosplan_action_msg):
         '''Reads the action parameters and uses them to initialise an actionlib message.
