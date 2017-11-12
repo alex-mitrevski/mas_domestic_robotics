@@ -2,27 +2,19 @@
 import rospy
 import actionlib
 
+from mdr_rosplan_interface.action_client_base import ActionClientBase
 from mdr_pickup_action.msg import PickUpAction, PickUpGoal
 import rosplan_dispatch_msgs.msg as plan_dispatch_msgs
 import rosplan_knowledge_msgs.srv as rosplan_srvs
 import diagnostic_msgs.msg as diag_msgs
 
-class PickupClient(object):
+class PickupClient(ActionClientBase):
     def __init__(self):
-        self.robot_name = None
+        super(PickupClient, self).__init__()
+
         self.obj_plane = None
         self.obj = None
-
-        self.action_name = rospy.get_param('~action_name', 'pickup')
-        self.action_name = self.action_name.lower()
-
         self.frame_id = rospy.get_param('~placing_pose_frame', 'base_link')
-
-        self.action_server_name = rospy.get_param('~server_name', 'pickup_server')
-        self.action_timeout = rospy.get_param('~action_timeout', 15.)
-        rospy.Subscriber('action_dispatch_topic',
-                         plan_dispatch_msgs.ActionDispatch,
-                         self.call_action)
 
         while not rospy.is_shutdown():
             rospy.sleep(0.1)
@@ -31,6 +23,8 @@ class PickupClient(object):
         # we only react to calls to this action
         if self.action_name != msg.name.lower():
             return
+
+        self.action_id = msg.action_id
 
         client = actionlib.SimpleActionClient(self.action_server_name, PickUpAction)
         client.wait_for_server()
@@ -43,8 +37,12 @@ class PickupClient(object):
         client.send_goal(goal)
         client.wait_for_result(rospy.Duration.from_sec(int(self.action_timeout)))
         result = client.get_result()
+
         if result and result.success:
             self.update_knowledge_base()
+            self.send_action_feedback(True)
+        else:
+            self.send_action_feedback(False)
 
     def get_action_message(self, rosplan_action_msg):
         '''Reads the action parameters and uses them to initialise an actionlib message.
