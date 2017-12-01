@@ -8,31 +8,31 @@ import math
 import smach
 
 from smach_ros import ActionServerWrapper, IntrospectionServer
-from mdr_pickup_action.msg import PickUpAction, PickUpResult, PickUpFeedback
+from mdr_place_action.msg import PlaceAction, PlaceResult, PlaceFeedback
 
 import mdr_lwr_kinematics.kinematics as kinematics
 import mdr_lwr_kinematics.move_arm as move_arm
 
 
-class SetupPickUp(smach.State):
+class SetupPlace(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['succeeded', 'failed'],
-                             input_keys=['pickup_goal'],
-                             output_keys=['pickup_feedback', 'pickup_result'])
+                             input_keys=['place_goal'],
+                             output_keys=['place_feedback', 'place_result'])
 
     def execute(self, userdata):
-        feedback = PickUpFeedback()
-        feedback.current_state = 'SETUP_PICKUP'
-        feedback.message = '[pickup] starting pickup skill'
-        userdata.pickup_feedback = feedback
+        feedback = PlaceFeedback()
+        feedback.current_state = 'SETUP_PLACE'
+        feedback.message = '[place] starting place skill'
+        userdata.place_feedback = feedback
         return 'succeeded'
 
 
-class PickUp(smach.State):
+class Place(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['succeeded', 'failed'],
-                             input_keys=['pickup_goal'],
-                             output_keys=['pickup_feedback', 'pickup_result'])
+                             input_keys=['place_goal'],
+                             output_keys=['place_feedback', 'place_result'])
 
         self.kinematics = kinematics.Kinematics('arm')
         self.move_arm = move_arm.MoveArm('arm')
@@ -54,17 +54,17 @@ class PickUp(smach.State):
 
     def execute(self, userdata):
         '''
-        Perform the pickup task
+        Perform the place task
 
-        :param goal: mdr_behavior_msgs.PickupRequest
-            goal.position: geometry_msgs.msg.PointStamped
+        :param req: mdr_behavior_msgs.PlaceRequest
+            req.position: geometry_msgs.msg.PointStamped
         '''
         rospy.logdebug('Start planning trajectory')
 
-        userdata.pickup_goal.position.point.y += 0.05
+        userdata.place_goal.position.point.y += 0.05
 
         # pre-calculate the trajectory to the position
-        traj = self.plan_trajectory(userdata.pickup_goal.position)
+        traj = self.plan_trajectory(userdata.place_goal.position)
 
         if (not traj):
             rospy.loginfo('No trajectory found')
@@ -72,19 +72,17 @@ class PickUp(smach.State):
 
         rospy.logdebug('Found a trajectory')
 
-        # open the hand
-        sdh_handle = self.sss.move('gripper', 'cylopen', blocking=False)
-
         # move the arm along the calculated trajectory to the grasp
+        # self.sss.move('arm', traj[0:len(traj)-2], blocking = True)
         self.move_arm.move(traj[0:len(traj) - 2])
 
-        # close the hand
-        rospy.logdebug('Grasping the object')
-        self.sss.move('gripper', 'cylclosed')
+        # open the hand
+        sdh_handle = self.sss.move('gripper', 'cylopen')
 
         # move to post-grasp
         rospy.logdebug('Moving to post-grasp')
         self.move_arm.move(traj[len(traj) - 2:len(traj)])
+        self.sss.move('gripper', 'cylclosed')
 
         rospy.loginfo('Grasped the object successfully')
         return 'succeeded'
@@ -144,7 +142,7 @@ class PickUp(smach.State):
             rospy.loginfo('Found post-grasp')
 
             # if all trajectories have been determined we return the result
-            return [list(prepregrasp), list(traj_pregrasp), list(traj_grasp), list(traj_post), list(prepregrasp)]
+            return [list(prepregrasp), list(traj_post), list(traj_grasp), list(traj_pregrasp), list(prepregrasp)]
 
         return None
 
@@ -205,12 +203,12 @@ class PickUp(smach.State):
 class SetActionLibResult(smach.State):
     def __init__(self, result):
         smach.State.__init__(self, outcomes=['succeeded'],
-                             input_keys=['pickup_goal'],
-                             output_keys=['pickup_feedback', 'pickup_result'])
+                             input_keys=['place_goal'],
+                             output_keys=['place_feedback', 'place_result'])
         self.result = result
 
     def execute(self, userdata):
-        result = PickUpResult()
+        result = PlaceResult()
         result.success = self.result
-        userdata.pickup_result = result
+        userdata.place_result = result
         return 'succeeded'
