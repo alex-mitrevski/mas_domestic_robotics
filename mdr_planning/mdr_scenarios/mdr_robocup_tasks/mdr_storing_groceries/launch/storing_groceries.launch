@@ -33,4 +33,17 @@
         <param name="problem_file" type="str" value="$(find mdr_storing_groceries)/common/default_problem.yaml" />
         <param name="kb_update_service" type="str" value="/kcl_rosplan/update_knowledge_base" />
     </node>
+
+    <!-- actions -->
+    <include file="$(find mdr_move_base_safe)/ros/launch/move_base_safe.launch" />
+    <include file="$(find mdr_move_base_safe)/ros/launch/move_base_safe_client.launch" />
+
+    <include file="$(find mdr_perceive_plane_action)/ros/launch/perceive_plane.launch" />
+    <include file="$(find mdr_perceive_plane_action)/ros/launch/perceive_plane_client.launch" />
+
+    <include file="$(find mdr_pickup_action)/ros/launch/pickup_action.launch" />
+    <include file="$(find mdr_pickup_action)/ros/launch/pickup_client.launch" />
+
+    <include file="$(find mdr_place_action)/ros/launch/place_action.launch" />
+    <include file="$(find mdr_place_action)/ros/launch/place_client.launch" />
 </launch>
