@@ -71,6 +71,8 @@ class MoveBaseSafeClient(ActionClientBase):
         arg_msg.value = source_location
         request.knowledge.values.append(arg_msg)
 
+        self.knowledge_update_client(request)
+
         # we add the fact that the robot is at the destination location to the knowledge base
         request = rosplan_srvs.KnowledgeUpdateServiceRequest()
         request.update_type = 0
@@ -86,6 +88,8 @@ class MoveBaseSafeClient(ActionClientBase):
         arg_msg.key = 'wp'
         arg_msg.value = destination_location
         request.knowledge.values.append(arg_msg)
+
+        self.knowledge_update_client(request)
 
 if __name__ == '__main__':
     rospy.init_node('move_base_safe_client')

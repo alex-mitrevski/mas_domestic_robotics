@@ -34,7 +34,7 @@ class PerceivePlaneClient(ActionClientBase):
         result = client.get_result()
 
         if result and result.success:
-            self.update_knowledge_base(goal.plane_config)
+            self.update_knowledge_base(goal.plane_config, result.recognized_objects)
             self.send_action_feedback(True)
         else:
             self.send_action_feedback(False)
@@ -50,7 +50,7 @@ class PerceivePlaneClient(ActionClientBase):
                 self.robot_name = param.value
         return goal
 
-    def update_knowledge_base(self, plane):
+    def update_knowledge_base(self, plane, objects):
         # we add the fact that the plane is not unexplored anymore to the knowledge base
         request = rosplan_srvs.KnowledgeUpdateServiceRequest()
         request.update_type = 0
@@ -63,6 +63,8 @@ class PerceivePlaneClient(ActionClientBase):
         arg_msg.value = plane
         request.knowledge.values.append(arg_msg)
 
+        self.knowledge_update_client(request)
+
         # we add the fact that the plane is explored to the knowledge base
         request = rosplan_srvs.KnowledgeUpdateServiceRequest()
         request.update_type = 0
@@ -73,6 +75,27 @@ class PerceivePlaneClient(ActionClientBase):
         arg_msg.key = 'plane'
         arg_msg.value = plane
         request.knowledge.values.append(arg_msg)
+
+        self.knowledge_update_client(request)
+
+        # we add the detected objects to the knowledge base
+        for obj in objects:
+            request = rosplan_srvs.KnowledgeUpdateServiceRequest()
+            request.update_type = 0
+            request.knowledge.knowledge_type = 1
+            request.knowledge.attribute_name = 'on'
+
+            arg_msg = diag_msgs.KeyValue()
+            arg_msg.key = 'obj'
+            arg_msg.value = obj.name
+            request.knowledge.values.append(arg_msg)
+
+            arg_msg = diag_msgs.KeyValue()
+            arg_msg.key = 'plane'
+            arg_msg.value = self.obj_plane
+            request.knowledge.values.append(arg_msg)
+
+            self.knowledge_update_client(request)
 
 if __name__ == '__main__':
     rospy.init_node('perceive_plane_client')

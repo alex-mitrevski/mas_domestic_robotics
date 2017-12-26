@@ -4,6 +4,7 @@ import abc
 
 import rospy
 import rosplan_dispatch_msgs.msg as plan_dispatch_msgs
+import rosplan_knowledge_msgs.srv as rosplan_srvs
 
 class ActionClientBase(object):
     def __init__(self):
@@ -18,6 +19,9 @@ class ActionClientBase(object):
 
         self.action_server_name = rospy.get_param('~server_name', '')
         self.action_timeout = rospy.get_param('~action_timeout', 15.)
+
+        self.knowledge_update_client = rospy.ServiceProxy('knowledge_update_service',
+                                                          rosplan_srvs.KnowledgeUpdateService)
 
         rospy.Subscriber('action_dispatch_topic',
                          plan_dispatch_msgs.ActionDispatch,

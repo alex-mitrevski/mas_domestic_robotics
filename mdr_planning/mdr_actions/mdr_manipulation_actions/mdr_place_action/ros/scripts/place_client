@@ -82,6 +82,8 @@ class PlaceClient(ActionClientBase):
         arg_msg.value = self.obj
         request.knowledge.values.append(arg_msg)
 
+        self.knowledge_update_client(request)
+
         # we add the fact that the robot's gripper is empty to the knowledge base
         request = rosplan_srvs.KnowledgeUpdateServiceRequest()
         request.update_type = 0
@@ -92,6 +94,8 @@ class PlaceClient(ActionClientBase):
         arg_msg.key = 'bot'
         arg_msg.value = self.robot_name
         request.knowledge.values.append(arg_msg)
+
+        self.knowledge_update_client(request)
 
         # we add the fact that the object is on the surface to the knowledge base
         request = rosplan_srvs.KnowledgeUpdateServiceRequest()
@@ -108,6 +112,8 @@ class PlaceClient(ActionClientBase):
         arg_msg.key = 'plane'
         arg_msg.value = self.obj_plane
         request.knowledge.values.append(arg_msg)
+
+        self.knowledge_update_client(request)
 
 if __name__ == '__main__':
     rospy.init_node('place_client')
