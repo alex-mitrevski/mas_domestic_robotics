@@ -74,7 +74,7 @@
         )
         :effect (and
             (at start (not (on ?obj ?plane)))
-            (at end (not (empty_gripper ?bot)))
+            (at start (not (empty_gripper ?bot)))
             (at end (holding ?bot ?obj))
         )
     )
@@ -89,7 +89,7 @@
         )
         :effect (and
             (at start (not (holding ?bot ?obj)))
-            (at end (empty_gripper ?bot))
+            (at start (empty_gripper ?bot))
             (at end (on ?obj ?plane))
         )
     )
